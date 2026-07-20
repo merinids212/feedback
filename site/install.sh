@@ -21,7 +21,7 @@ RC="$HOME/.zshrc"
 if [ -f "$RC" ] && grep -qF "$LINE" "$RC"; then
   dim "  ~/.zshrc already sources feedback"
 else
-  printf '\n# feedback — notes from friends tunnel into Claude Code\n%s\n' "$LINE" >> "$RC"
+  printf '\n# feedback — notes from friends tunnel into your coding agent\n%s\n' "$LINE" >> "$RC"
   dim "  wired into ~/.zshrc"
 fi
 

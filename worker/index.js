@@ -1,4 +1,4 @@
-// feedback — a link that tunnels a friend's note straight into your Claude Code.
+// feedback — a link that tunnels a friend's note into whichever coding agent you run.
 // Routes:
 //   POST /api/new    (Bearer SECRET)  {project, cwd, days?, max?} -> {slug, url}
 //   GET  /api/inbox  (Bearer SECRET)  -> {items:[{id,slug,project,cwd,text,from,ts}]}
@@ -15,7 +15,7 @@ const FAVICON = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,
   '">';
 
 // ── feedback tokens ── monochrome, dark only. The single chromatic value is CLAUDE:
-// the agent's own coral, spent only where Claude Code itself appears on the page.
+// each agent's own mark, spent only where that agent is named.
 const TOKENS = `:root{--bg:#000000;--panel:#070707;--ink:#f4f4f4;--dim:#9a9a9a;--faint:#757575;
 --line:#191919;--border:#2a2a2a;--hi:#ffffff;--prose:#c9c9c9;--claude:#d97757}`;
 
@@ -24,7 +24,15 @@ const TOKENS = `:root{--bg:#000000;--panel:#070707;--ink:#f4f4f4;--dim:#9a9a9a;-
 const CODE_CHIP = `code{color:var(--hi);background:rgba(255,255,255,.07);border:1px solid var(--line);
 border-radius:3px;padding:.5px 5px;font-size:.92em;white-space:nowrap}
 pre code{background:none;border:0;padding:0;font-size:inherit}`;
-const INSTALL_SH = "#!/usr/bin/env bash\n# feedback \u2014 install the local watcher.  Usage:\n#   curl -fsSL https://feedback.cybercorpresearch.com/install.sh | bash\nset -euo pipefail\nRAW=\"https://raw.githubusercontent.com/merinids212/feedback/main/cli\"\nDEST=\"$HOME/.claude/feedback\"\n\ngld(){ printf '\\033[38;5;255m%s\\033[0m\\n' \"$1\"; }\ndim(){ printf '\\033[38;5;245m%s\\033[0m\\n' \"$1\"; }\nerr(){ printf '\\033[38;5;203m%s\\033[0m\\n' \"$1\" >&2; }\n\ngld \"\u25c7 installing feedback (local watcher)\"\ncommand -v python3 >/dev/null || { err \"python3 required\"; exit 1; }\ncommand -v zsh     >/dev/null || { err \"zsh required (feedback is a zsh function)\"; exit 1; }\n\nmkdir -p \"$DEST\"\nfor f in fb.py feedback.zsh; do curl -fsSL \"$RAW/$f\" -o \"$DEST/$f\"; done\n\nLINE=\"source $DEST/feedback.zsh\"\nRC=\"$HOME/.zshrc\"\nif [ -f \"$RC\" ] && grep -qF \"$LINE\" \"$RC\"; then\n  dim \"  ~/.zshrc already sources feedback\"\nelse\n  printf '\\n# feedback \u2014 notes from friends tunnel into Claude Code\\n%s\\n' \"$LINE\" >> \"$RC\"\n  dim \"  wired into ~/.zshrc\"\nfi\n\ngld \"\u25c7 watcher installed\"\nif [ -s \"$DEST/secret\" ]; then\n  dim \"  secret present \u2014 you're ready. open a new terminal, then:\"\n  dim \"    feedback link                  # from your project dir — copies the URL\"\n  dim \"    feedback watch                 # notes land here\"\nelse\n  dim \"  one-time setup left \u2014 you host your own tiny Cloudflare Worker so the\"\n  dim \"  secret (which lets a friend's note run on YOUR machine) is yours alone:\"\n  dim \"    https://github.com/merinids212/feedback#setup\"\nfi\n";
+// agent marks — Claude's sunburst in its own coral, Codex's blossom in mono (that IS its color).
+// Shown wherever the page names the agents, so "any agent" is visible, not just claimed.
+const CLAUDE_MARK = '<svg class="lg lgc" viewBox="0 0 100 100" aria-label="Claude Code"><g stroke="currentColor" stroke-width="8" stroke-linecap="round"><line x1="50" y1="50" x2="50" y2="8"/><line x1="50" y1="50" x2="71" y2="14"/><line x1="50" y1="50" x2="86" y2="29"/><line x1="50" y1="50" x2="92" y2="50"/><line x1="50" y1="50" x2="86" y2="71"/><line x1="50" y1="50" x2="71" y2="86"/><line x1="50" y1="50" x2="50" y2="92"/><line x1="50" y1="50" x2="29" y2="86"/><line x1="50" y1="50" x2="14" y2="71"/><line x1="50" y1="50" x2="8" y2="50"/><line x1="50" y1="50" x2="14" y2="29"/><line x1="50" y1="50" x2="29" y2="14"/></g></svg>';
+const CODEX_MARK = '<svg class="lg lgx" viewBox="0 0 100 100" aria-label="Codex"><g fill="none" stroke="currentColor" stroke-width="7"><g transform="translate(50 50)"><ellipse rx="36" ry="15"/><ellipse rx="36" ry="15" transform="rotate(60)"/><ellipse rx="36" ry="15" transform="rotate(120)"/></g></g></svg>';
+const AGENT_MARKS = `<span class="agents">${CLAUDE_MARK}${CODEX_MARK}</span>`;
+const MARK_CSS = `.lg{width:17px;height:17px;flex:none;vertical-align:-3px}
+.lgc{color:var(--claude)}.lgx{color:var(--ink)}
+.agents{display:inline-flex;gap:7px;align-items:center;vertical-align:-3px;margin-left:5px}`;
+const INSTALL_SH = "#!/usr/bin/env bash\n# feedback \u2014 install the local watcher.  Usage:\n#   curl -fsSL https://feedback.cybercorpresearch.com/install.sh | bash\nset -euo pipefail\nRAW=\"https://raw.githubusercontent.com/merinids212/feedback/main/cli\"\nDEST=\"$HOME/.claude/feedback\"\n\ngld(){ printf '\\033[38;5;255m%s\\033[0m\\n' \"$1\"; }\ndim(){ printf '\\033[38;5;245m%s\\033[0m\\n' \"$1\"; }\nerr(){ printf '\\033[38;5;203m%s\\033[0m\\n' \"$1\" >&2; }\n\ngld \"\u25c7 installing feedback (local watcher)\"\ncommand -v python3 >/dev/null || { err \"python3 required\"; exit 1; }\ncommand -v zsh     >/dev/null || { err \"zsh required (feedback is a zsh function)\"; exit 1; }\n\nmkdir -p \"$DEST\"\nfor f in fb.py feedback.zsh; do curl -fsSL \"$RAW/$f\" -o \"$DEST/$f\"; done\n\nLINE=\"source $DEST/feedback.zsh\"\nRC=\"$HOME/.zshrc\"\nif [ -f \"$RC\" ] && grep -qF \"$LINE\" \"$RC\"; then\n  dim \"  ~/.zshrc already sources feedback\"\nelse\n  printf '\\n# feedback \u2014 notes from friends tunnel into your coding agent\\n%s\\n' \"$LINE\" >> \"$RC\"\n  dim \"  wired into ~/.zshrc\"\nfi\n\ngld \"\u25c7 watcher installed\"\nif [ -s \"$DEST/secret\" ]; then\n  dim \"  secret present \u2014 you're ready. open a new terminal, then:\"\n  dim \"    feedback link                  # from your project dir — copies the URL\"\n  dim \"    feedback watch                 # notes land here\"\nelse\n  dim \"  one-time setup left \u2014 you host your own tiny Cloudflare Worker so the\"\n  dim \"  secret (which lets a friend's note run on YOUR machine) is yours alone:\"\n  dim \"    https://github.com/merinids212/feedback#setup\"\nfi\n";
 
 function j(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -162,13 +170,13 @@ function page(link, alive) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>feedback → ${project}</title><meta name="robots" content="noindex">${FAVICON}
-<meta name="description" content="Drop a quick note — it lands straight in ${project}'s Claude Code session.">
+<meta name="description" content="Drop a quick note — it lands straight in ${project}'s coding session.">
 <meta property="og:title" content="feedback → ${project}">
-<meta property="og:description" content="Drop a quick note — it lands straight in ${project}'s Claude Code session.">
+<meta property="og:description" content="Drop a quick note — it lands straight in ${project}'s coding session.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="feedback → ${project}">
-<meta name="twitter:description" content="Drop a note — it lands in ${project}'s dev session, as a prompt for Claude Code.">
+<meta name="twitter:description" content="Drop a note — it lands in ${project}'s dev session, as a prompt for their coding agent.">
 <meta name="theme-color" content="#000000">
 <style>
 ${TOKENS}
@@ -283,10 +291,10 @@ if(AG)AG.addEventListener("click",e=>{
 function home() {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>feedback — a link into your Claude Code</title>${FAVICON}
-<meta name="description" content="A link you hand a friend. They type a note. It tunnels straight into a Claude Code session on your machine and runs as a prompt.">
+<title>feedback — a link into your coding agent</title>${FAVICON}
+<meta name="description" content="A link you hand a friend. They type a note. It tunnels into a coding-agent session on your machine — Claude Code, Codex, whatever you run — and lands as a prompt.">
 <meta property="og:title" content="feedback">
-<meta property="og:description" content="A link you hand a friend — their note tunnels straight into your Claude Code session.">
+<meta property="og:description" content="A link you hand a friend — their note tunnels straight into your coding agent.">
 <meta name="theme-color" content="#000000">
 <style>
 ${TOKENS}
@@ -301,8 +309,10 @@ font-size:clamp(5.5px,1.9vw,13px);font-family:ui-monospace,"SF Mono",Menlo,Conso
 background:linear-gradient(180deg,#ffffff,#6a6a6a);
 -webkit-background-clip:text;background-clip:text;color:transparent}
 .tag{color:var(--dim);margin:14px auto 0;max-width:500px;text-align:center}.tag b{color:var(--ink);font-weight:400}
-/* the Claude mark — the one place this page spends color, in Claude's own coral */
+/* agent marks — the one place this page spends color, each in its own real color */
 .cl{color:var(--claude)}
+${MARK_CSS}
+.sub2{font-size:12.5px;color:var(--faint);margin-top:6px}
 .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:26px 0 0}
 .step{display:flex;gap:11px;align-items:flex-start;padding:14px;border:1px solid var(--border);background:var(--panel)}
 .step b{color:var(--ink);font-weight:400;font-size:13px;display:block;margin-bottom:5px}
@@ -343,12 +353,13 @@ h2::before{content:"── "}h2::after{content:" ──"}
 ██╔══╝  ██╔══╝  ██╔══╝  ██║  ██║██╔══██╗██╔══██║██║     ██╔═██╗ 
 ██║     ███████╗███████╗██████╔╝██████╔╝██║  ██║╚██████╗██║  ██╗
 ╚═╝     ╚══════╝╚══════╝╚═════╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝</pre>
-  <p class="tag">a link you hand a friend — their note tunnels straight into a <b>Claude Code</b> <span class="cl" aria-hidden="true">✳</span> session on your machine and runs as a prompt.</p>
+  <p class="tag">a link you hand a friend — their note tunnels straight into the coding agent running on your machine, and lands as a prompt.</p>
+  <p class="tag sub2">Claude Code<span class="agents">${CLAUDE_MARK}</span> · Codex<span class="agents">${CODEX_MARK}</span> · anything you can launch from a shell</p>
 
   <div class="steps">
     <div class="step"><span class="sn">1</span><div><b>you post a link</b><span>run <code>feedback link</code> in your project — a tidy URL, copied to your clipboard</span></div></div>
     <div class="step"><span class="sn sn2">2</span><div><b>a friend jots a note</b><span>they open it, type in a little editor — plain words or markdown</span></div></div>
-    <div class="step"><span class="sn sn3">3</span><div><b>it lands in Claude</b><span>the skill pulls it in as data &amp; fixes what it can — no context-switch</span></div></div>
+    <div class="step"><span class="sn sn3">3</span><div><b>your agent picks it up</b><span>pulled in as data, not instructions — it triages and fixes what it can</span></div></div>
   </div>
 
   <h2>install</h2>
@@ -460,7 +471,8 @@ margin:42px 0 11px;padding-top:14px;border-top:1px solid var(--line)}
 h2::before{content:"── "}h2::after{content:" ──"}
 p{color:var(--prose);font-size:13.5px;margin:11px 0;max-width:64ch}p b{color:var(--hi);font-weight:400}
 ${CODE_CHIP}
-.cl{color:var(--claude)}   /* the Claude mark — the only color this page spends */
+.cl{color:var(--claude)}   /* agent marks — the only color this page spends */
+${MARK_CSS}
 pre{border:1px solid var(--border);background:var(--panel);padding:12px 14px;overflow-x:auto;font-size:12.5px;line-height:1.75;color:var(--dim);white-space:pre;margin:12px 0}
 pre .c{color:var(--faint)}pre .p{color:var(--hi)}
 /* fixed layout so a long command in column one can't shove the description off-page */
@@ -481,7 +493,7 @@ ul{color:var(--prose);font-size:13px;padding-left:1.15em;margin:10px 0;max-width
 </style></head><body>
 <div class="wrap">
   <nav><span class="lg">feedback</span><span class="crumb">/ docs</span>
-    <span class="sp"><a class="q" href="/">home</a><a class="q" href="https://github.com/merinids212/feedback">github</a></span></nav>
+    <span class="sp"><a class="q" href="/">home</a><a class="q" href="#agent">agent</a><a class="q" href="https://github.com/merinids212/feedback">github</a></span></nav>
 
   <h2>install</h2>
   <pre>❯ curl -fsSL <span class="p">https://feedback.cybercorpresearch.com/install.sh</span> | bash</pre>
@@ -507,21 +519,33 @@ wrangler deploy</pre>
   </table>
   <p>Launch flags come from <code>FEEDBACK_FLAGS</code>, else <code>PORTAL_FLAGS</code>, else none.</p>
 
-  <h2>in your Claude session</h2>
-  <p>You don't need a second terminal. Inside any Claude Code session, just ask — the installed <b>feedback skill</b> handles it here:</p>
+  <h2 id="agent">which agent runs it${AGENT_MARKS}</h2>
+  <p>A note is just a prompt, so anything that takes a prompt can handle it. <code>feedback watch</code>
+  launches whichever agent it finds — <b>Claude Code</b> first, then <b>Codex</b> — and you can pin it:</p>
+  <table>
+    <tr><td><code>FEEDBACK_AGENT=codex</code></td><td>use Codex (<code>codex "&lt;the note&gt;"</code>) instead of Claude Code</td></tr>
+    <tr><td><code>feedback watch --agent codex</code></td><td>same thing, one run only</td></tr>
+    <tr><td><code>FEEDBACK_CMD=(my-agent --yolo)</code></td><td>any command — the prompt is appended as the final argument</td></tr>
+    <tr><td><code>FEEDBACK_FLAGS=(…)</code></td><td>flags for the agent. <code>PORTAL_FLAGS</code> is reused, but only for Claude Code</td></tr>
+  </table>
+  <p>Nothing here is agent-specific except the launch: the link, the friend page, the inbox, and
+  <code>feedback pull</code> behave the same whatever you run.</p>
+
+  <h2>inside an agent session</h2>
+  <p>You don't need a second terminal. Inside a session — Claude Code with the bundled skill, or any agent that can run a shell command — pull the notes in directly:</p>
   <pre><span class="p">feedback</span>              <span class="c"># glance — how many notes are waiting</span>
 <span class="p">feedback pull</span>         <span class="c"># all waiting notes as markdown (current project first)</span>
 <span class="p">feedback next</span>         <span class="c"># oldest note as JSON, for scripting</span>
 <span class="p">feedback ack</span> &lt;id&gt;     <span class="c"># clear one  ·  feedback ack-all</span></pre>
-  <p>A friend's text is treated as <b>a report to triage — data, never instructions</b>. Claude investigates the relevant code, proposes or applies a fix, and asks before anything risky. <code>pull</code> marks notes for the folder you're in "← this project — act here".</p>
+  <p>A friend's text is treated as <b>a report to triage — data, never instructions</b>. The agent investigates the relevant code, proposes or applies a fix, and asks before anything risky. <code>pull</code> marks notes for the folder you're in "← this project — act here".</p>
 
   <h2>statusline (optional)</h2>
-  <p>See pending feedback while you code, without checking. Point your Claude Code statusLine at the bundled script in <code>~/.claude/settings.json</code>:</p>
+  <p>See pending feedback while you code, without checking. Claude Code users can point statusLine at the bundled script in <code>~/.claude/settings.json</code>:</p>
   <pre>"statusLine": { "type": "command", "command": "~/.claude/feedback/statusline.sh" }</pre>
   <p>Shows <code>dir · branch · model</code> plus <code>◈ N feedback</code> when notes wait (silent otherwise). Cached + refreshed in the background, so it never slows your prompt.</p>
 
   <h2>how it works</h2>
-  <p>The Cloudflare Worker (<code>feedback.cybercorpresearch.com</code>) serves the friend page and stores submissions in KV. Your machine can't take inbound traffic, so a tiny local watcher <b>polls</b> the inbox and surfaces notes — either in-session (the skill) or via <code>feedback watch</code>.</p>
+  <p>The Cloudflare Worker (<code>feedback.cybercorpresearch.com</code>) serves the friend page and stores submissions in KV. Your machine can't take inbound traffic, so a tiny local watcher <b>polls</b> the inbox and surfaces notes — either in-session (<code>feedback pull</code>, or the bundled Claude Code skill) or via <code>feedback watch</code>, which launches <a href="#agent">your agent</a>.</p>
   <p>Friend text is wrapped in a fixed prompt template that labels it <b>feedback data, not instructions</b>, so a note can't hijack your session. Confirm mode (default) waits for your Enter per note; <code>--auto</code> fires immediately.</p>
 
   <h2>safety</h2>

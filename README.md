@@ -1,7 +1,8 @@
 # feedback
 
-A link you hand a friend. They type a note. It tunnels straight into a Claude Code
-session on your machine and runs as a prompt.
+A link you hand a friend. They type a note. It tunnels straight into the coding agent on
+your machine and lands as a prompt — Claude Code, Codex, or anything you can launch from a
+shell.
 
 ```
 you:     feedback link                       →  https://feedback…/f/x7k2m9p   (this folder, auto)
@@ -10,7 +11,7 @@ you:     feedback watch
          ◈ feedback on myapp from alex
            │ the export button does nothing on mobile
          ↵ run in claude · s skip · q quit     →  ↵
-         ▸ launching claude in ~/code/myapp
+         ▸ launching claude in ~/code/myapp        (FEEDBACK_AGENT=codex to switch)
 ```
 
 A [cybercorpresearch](https://portal.cybercorpresearch.com) production.
@@ -19,7 +20,7 @@ A [cybercorpresearch](https://portal.cybercorpresearch.com) production.
 
 - A Cloudflare Worker (`feedback.cybercorpresearch.com`) serves the friend-facing page
   and stores submissions in KV. Your machine can't take inbound traffic, so a tiny local
-  watcher **polls** the inbox and fires `claude` when notes arrive.
+  watcher **polls** the inbox and fires your agent when notes arrive.
 - Friend text is wrapped in a fixed prompt template that labels it **feedback data, not
   instructions** — so a note can't hijack your session. Risky/destructive actions still
   ask you first.
@@ -45,13 +46,28 @@ echo 'source ~/.claude/feedback/feedback.zsh' >> ~/.zshrc
 | | |
 |---|---|
 | `feedback link [dir] [--days N] [--max N]` | mint a link for the current folder (or `[dir]`) — copies to clipboard |
-| `feedback watch [--auto]` | wait for notes; Enter fires each in `claude` (`--auto` skips the Enter) |
+| `feedback watch [--auto] [--agent NAME]` | wait for notes; Enter fires each in your agent (`--auto` skips the Enter) |
 | `feedback ls` | list active links + inbox count |
 | `feedback kill <slug>` | disable a link |
+| `feedback pull` · `next` · `ack <id>` | read notes from inside an agent session, as markdown or JSON |
 
-Launch flags come from `FEEDBACK_FLAGS`, else `PORTAL_FLAGS`, else none.
+## Which agent runs it
 
-## Auto-watch in your statusline (optional)
+A note is just a prompt, so anything that takes one can handle it. `feedback watch` uses
+whichever agent it finds — Claude Code first, then Codex — and you can pin it:
+
+```bash
+FEEDBACK_AGENT=codex            # or any command on PATH
+feedback watch --agent codex    # one run only
+FEEDBACK_CMD=(my-agent --yolo)  # full control; the prompt is appended as the last argument
+FEEDBACK_FLAGS=(--flag)         # flags for the agent (PORTAL_FLAGS is reused, Claude Code only)
+```
+
+Only the launch is agent-specific. The link, the friend page, the inbox, and `feedback pull`
+work the same whatever you run — inside a Codex session, `feedback pull` prints the waiting
+notes as markdown and you carry on.
+
+## Statusline (optional, Claude Code)
 
 See pending feedback while you code, without checking. Add to `~/.claude/settings.json`:
 

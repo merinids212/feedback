@@ -79,6 +79,28 @@ if command -v node >/dev/null; then node --check "$ROOT/worker/index.js" && ok "
 if command -v node >/dev/null; then node "$ROOT/tests/render_check.mjs" >/dev/null 2>&1 && ok "rendered page scripts all parse" || no "rendered page scripts parse" "run: node tests/render_check.mjs"; fi
 python3 -c "import ast;ast.parse(open('$ROOT/cli/fb.py').read())" && ok "fb.py parses" || no "fb.py parses"
 if command -v zsh >/dev/null; then zsh -n "$ROOT/cli/feedback.zsh" && ok "feedback.zsh syntax" || no "feedback.zsh"; fi
+
+# a note is just a prompt — any agent must be able to take it. Resolution runs against a
+# fake PATH so the result doesn't depend on what's installed on this machine.
+if command -v zsh >/dev/null; then
+  AGENTDIR=$(mktemp -d)
+  for a in claude codex my-agent; do printf '#!/bin/sh\necho %s\n' "$a" > "$AGENTDIR/$a"; chmod +x "$AGENTDIR/$a"; done
+  agent_is() {  # agent_is <expected> [env assignments...]
+    local want="$1"; shift
+    PATH="$AGENTDIR:/usr/bin:/bin" zsh -c "
+      source '$ROOT/cli/feedback.zsh' >/dev/null 2>&1
+      $*
+      print -r -- \$(_feedback_agent_cmd)" 2>/dev/null | tr -d '\n'
+  }
+  chk "agent defaults to claude when both are installed" "$(agent_is x '')" "claude"
+  chk "FEEDBACK_AGENT=codex switches the launcher" "$(agent_is x 'FEEDBACK_AGENT=codex')" "codex"
+  chk "FEEDBACK_CMD wins and keeps its flags" "$(agent_is x 'FEEDBACK_CMD=(my-agent --yolo)')" "my-agent --yolo"
+  chk "falls back to codex when claude is absent" \
+      "$(PATH="$AGENTDIR:/usr/bin:/bin" zsh -c "rm -f '$AGENTDIR/claude'; source '$ROOT/cli/feedback.zsh' >/dev/null 2>&1; print -r -- \$(_feedback_agent_cmd)" | tr -d '\n')" "codex"
+  chk "unknown agent resolves to nothing (caller errors)" \
+      "$(agent_is x 'FEEDBACK_AGENT=not-a-real-agent')" ""
+  rm -rf "$AGENTDIR"
+fi
 bash -n "$ROOT/site/install.sh" && ok "install.sh syntax" || no "install.sh"
 # the Worker serves its own INSTALL_SH string; site/install.sh is the readable copy.
 # They drifted once — whatever curl | bash actually runs must be what's in the repo.
