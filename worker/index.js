@@ -155,11 +155,11 @@ export default {
       const alive = link && !link.dead && Date.now() < link.expires && link.count < link.max;
 
       if (req.method === "POST") {
-        if (!alive) return j({ error: "this link is no longer active" }, 410);
-        // MAX_TEXT is enforced after parsing, which is too late: json() buffers whatever
-        // arrives. Anyone with the link could otherwise push megabytes through it.
+        // Size first, liveness second: a dead or bogus slug shouldn't be a free way to
+        // make the Worker buffer megabytes. MAX_TEXT applies after parsing — too late.
         const len = Number(req.headers.get("content-length") || 0);
         if (len > MAX_BODY) return j({ error: "too long" }, 413);
+        if (!alive) return j({ error: "this link is no longer active" }, 410);
         const raw = await req.text();
         if (raw.length > MAX_BODY) return j({ error: "too long" }, 413);
         let b = {};
