@@ -14,15 +14,27 @@ command -v python3 >/dev/null || { err "python3 required"; exit 1; }
 command -v zsh     >/dev/null || { err "zsh required (feedback is a zsh function)"; exit 1; }
 
 mkdir -p "$DEST"
-for f in fb.py feedback.zsh; do curl -fsSL "$RAW/$f" -o "$DEST/$f"; done
+# Stage and validate before anything lands in place: feedback.zsh is sourced by every new
+# shell, so a truncated download would break the login shell itself.
+TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+for f in fb.py feedback.zsh; do
+  curl -fsSL "$RAW/$f" -o "$TMP/$f" || { err "download failed: $f"; exit 1; }
+  [ -s "$TMP/$f" ] || { err "download was empty: $f"; exit 1; }
+done
+python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$TMP/fb.py" \
+  || { err "fb.py failed to parse - refusing to install a broken file"; exit 1; }
+zsh -n "$TMP/feedback.zsh" \
+  || { err "feedback.zsh failed to parse - refusing to wire a broken file into ~/.zshrc"; exit 1; }
+for f in fb.py feedback.zsh; do mv "$TMP/$f" "$DEST/$f"; done
 
 LINE="source $DEST/feedback.zsh"
 RC="$HOME/.zshrc"
 if [ -f "$RC" ] && grep -qF "$LINE" "$RC"; then
   dim "  ~/.zshrc already sources feedback"
 else
+  [ -f "$RC" ] && cp "$RC" "$RC.feedback-backup"
   printf '\n# feedback — notes from friends tunnel into your coding agent\n%s\n' "$LINE" >> "$RC"
-  dim "  wired into ~/.zshrc"
+  dim "  wired into ~/.zshrc (previous copy saved as ~/.zshrc.feedback-backup)"
 fi
 
 gld "◇ watcher installed"

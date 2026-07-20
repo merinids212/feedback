@@ -103,6 +103,11 @@ here is exactly what is and isn't protected.
   visitor came from), plus `no-store`, `x-frame-options: DENY`, `nosniff`, and a CSP that
   allows only the page's own inline assets.
 - **Bodies are capped before parsing** — over 16 KB gets a 413 instead of being buffered.
+- **Nothing outlives its link.** Notes expire from KV after 30 days; the link record (project
+  name + the folder path it routes to) expires a week after the link, rather than never.
+- **The installer validates before it wires.** Both files are staged, parsed, and only then
+  moved into place, so a truncated download can't break the shell that sources them; `~/.zshrc`
+  is backed up first.
 - **Bounded.** Notes cap at 4,000 chars, trim before an agent sees them, and expire from KV after
   30 days. Links expire (7d) and cap submissions (50). `feedback kill <slug>` ends one instantly.
 

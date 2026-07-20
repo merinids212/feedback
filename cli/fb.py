@@ -133,10 +133,22 @@ def main():
             ts, n = int(raw[0]), int(raw[1])
         except Exception:
             pass
+        # Claude Code renders the statusline constantly. Without a lock, every render
+        # during a slow refresh spawns another one — a process storm against your own
+        # Worker. O_EXCL means exactly one wins; a stale lock (>60s) is reclaimed.
+        lock = os.path.expanduser("~/.claude/feedback/.refresh.lock")
         if time.time() - ts > 45:
-            subprocess.Popen(
-                [sys.executable, os.path.abspath(__file__), "_refresh"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                if os.path.exists(lock) and time.time() - os.path.getmtime(lock) > 60:
+                    os.unlink(lock)
+                fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                os.close(fd)
+            except OSError:
+                pass                      # someone else is already refreshing
+            else:
+                subprocess.Popen(
+                    [sys.executable, os.path.abspath(__file__), "_refresh"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if n and n > 0:
             print("\033[38;5;230m\u25c8 %d feedback\033[0m" % n)
         # else: print nothing
@@ -147,6 +159,11 @@ def main():
                 f.write("%d %d" % (int(time.time()), n))
         except Exception:
             pass
+        finally:                          # always release, even on a network failure
+            try:
+                os.unlink(os.path.expanduser("~/.claude/feedback/.refresh.lock"))
+            except OSError:
+                pass
     elif cmd in ("", "count"):
         try:
             n = len(call("/api/inbox")["items"])

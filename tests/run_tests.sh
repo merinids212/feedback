@@ -139,6 +139,23 @@ PYEOF
 )
   chk "pull fences hostile text with an unguessable tag" "$FENCE" "tagged"
 fi
+
+# the statusline renders on every frame with a folder/branch name in it — untrusted text
+# that must never be re-interpreted as terminal escapes
+if command -v bash >/dev/null; then
+  EVIL='{"workspace":{"current_dir":"/tmp/e[2Kvil"},"model":{"display_name":"m"}}'
+  RAW=$(printf '%s' "$EVIL" | bash "$ROOT/statusline.sh" 2>/dev/null | od -c | grep -c '033   \[   2   K' || true)
+  chk "statusline does not emit escapes from a folder name" "$RAW" "0"
+  # and the branch must actually resolve — `git -C <basename>` silently never did
+  BR=$(printf '{"workspace":{"current_dir":"%s"},"model":{"display_name":"m"}}' "$ROOT" \
+       | bash "$ROOT/statusline.sh" 2>/dev/null | tr -d '\001-\037' | grep -c "$(git -C "$ROOT" branch --show-current)" || true)
+  chk "statusline resolves the git branch from the full path" "$BR" "1"
+fi
+
+# the installer wires a file into ~/.zshrc — it must validate before it lands
+grep -q 'mktemp -d' "$ROOT/site/install.sh" && grep -q 'zsh -n' "$ROOT/site/install.sh" \
+  && ok "installer validates downloads before installing them" \
+  || no "installer validates downloads" "stage + parse-check missing"
 bash -n "$ROOT/site/install.sh" && ok "install.sh syntax" || no "install.sh"
 # the Worker serves its own INSTALL_SH string; site/install.sh is the readable copy.
 # They drifted once — whatever curl | bash actually runs must be what's in the repo.

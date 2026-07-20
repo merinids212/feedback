@@ -33,7 +33,7 @@ const AGENT_MARKS = `<span class="agents">${CLAUDE_MARK}${CODEX_MARK}</span>`;
 const MARK_CSS = `.lg{width:17px;height:17px;flex:none;vertical-align:-3px}
 .lgc{color:var(--claude)}.lgx{color:var(--ink)}
 .agents{display:inline-flex;gap:7px;align-items:center;vertical-align:-3px;margin-left:5px}`;
-const INSTALL_SH = "#!/usr/bin/env bash\n# feedback \u2014 install the local watcher.  Usage:\n#   curl -fsSL https://feedback.cybercorpresearch.com/install.sh | bash\nset -euo pipefail\nRAW=\"https://raw.githubusercontent.com/merinids212/feedback/main/cli\"\nDEST=\"$HOME/.claude/feedback\"\n\ngld(){ printf '\\033[38;5;230m%s\\033[0m\\n' \"$1\"; }\ndim(){ printf '\\033[38;5;187m%s\\033[0m\\n' \"$1\"; }\nerr(){ printf '\\033[38;5;203m%s\\033[0m\\n' \"$1\" >&2; }\n\ngld \"\u25c7 installing feedback (local watcher)\"\ncommand -v python3 >/dev/null || { err \"python3 required\"; exit 1; }\ncommand -v zsh     >/dev/null || { err \"zsh required (feedback is a zsh function)\"; exit 1; }\n\nmkdir -p \"$DEST\"\nfor f in fb.py feedback.zsh; do curl -fsSL \"$RAW/$f\" -o \"$DEST/$f\"; done\n\nLINE=\"source $DEST/feedback.zsh\"\nRC=\"$HOME/.zshrc\"\nif [ -f \"$RC\" ] && grep -qF \"$LINE\" \"$RC\"; then\n  dim \"  ~/.zshrc already sources feedback\"\nelse\n  printf '\\n# feedback \u2014 notes from friends tunnel into your coding agent\\n%s\\n' \"$LINE\" >> \"$RC\"\n  dim \"  wired into ~/.zshrc\"\nfi\n\ngld \"\u25c7 watcher installed\"\nif [ -s \"$DEST/secret\" ]; then\n  dim \"  secret present \u2014 you're ready. open a new terminal, then:\"\n  dim \"    feedback link                  # from your project dir — copies the URL\"\n  dim \"    feedback watch                 # notes land here\"\nelse\n  dim \"  one-time setup left \u2014 you host your own tiny Cloudflare Worker so the\"\n  dim \"  secret (which lets a friend's note run on YOUR machine) is yours alone:\"\n  dim \"    https://github.com/merinids212/feedback#setup\"\nfi\n";
+const INSTALL_SH = "#!/usr/bin/env bash\n# feedback \u2014 install the local watcher.  Usage:\n#   curl -fsSL https://feedback.cybercorpresearch.com/install.sh | bash\nset -euo pipefail\nRAW=\"https://raw.githubusercontent.com/merinids212/feedback/main/cli\"\nDEST=\"$HOME/.claude/feedback\"\n\ngld(){ printf '\\033[38;5;230m%s\\033[0m\\n' \"$1\"; }\ndim(){ printf '\\033[38;5;187m%s\\033[0m\\n' \"$1\"; }\nerr(){ printf '\\033[38;5;203m%s\\033[0m\\n' \"$1\" >&2; }\n\ngld \"\u25c7 installing feedback (local watcher)\"\ncommand -v python3 >/dev/null || { err \"python3 required\"; exit 1; }\ncommand -v zsh     >/dev/null || { err \"zsh required (feedback is a zsh function)\"; exit 1; }\n\nmkdir -p \"$DEST\"\n# Stage and validate before anything lands in place: feedback.zsh is sourced by every new\n# shell, so a truncated download would break the login shell itself.\nTMP=$(mktemp -d); trap 'rm -rf \"$TMP\"' EXIT\nfor f in fb.py feedback.zsh; do\n  curl -fsSL \"$RAW/$f\" -o \"$TMP/$f\" || { err \"download failed: $f\"; exit 1; }\n  [ -s \"$TMP/$f\" ] || { err \"download was empty: $f\"; exit 1; }\ndone\npython3 -c \"import ast,sys;ast.parse(open(sys.argv[1]).read())\" \"$TMP/fb.py\" \\\n  || { err \"fb.py failed to parse - refusing to install a broken file\"; exit 1; }\nzsh -n \"$TMP/feedback.zsh\" \\\n  || { err \"feedback.zsh failed to parse - refusing to wire a broken file into ~/.zshrc\"; exit 1; }\nfor f in fb.py feedback.zsh; do mv \"$TMP/$f\" \"$DEST/$f\"; done\n\nLINE=\"source $DEST/feedback.zsh\"\nRC=\"$HOME/.zshrc\"\nif [ -f \"$RC\" ] && grep -qF \"$LINE\" \"$RC\"; then\n  dim \"  ~/.zshrc already sources feedback\"\nelse\n  [ -f \"$RC\" ] && cp \"$RC\" \"$RC.feedback-backup\"\n  printf '\\n# feedback \u2014 notes from friends tunnel into your coding agent\\n%s\\n' \"$LINE\" >> \"$RC\"\n  dim \"  wired into ~/.zshrc (previous copy saved as ~/.zshrc.feedback-backup)\"\nfi\n\ngld \"\u25c7 watcher installed\"\nif [ -s \"$DEST/secret\" ]; then\n  dim \"  secret present \u2014 you're ready. open a new terminal, then:\"\n  dim \"    feedback link                  # from your project dir \u2014 copies the URL\"\n  dim \"    feedback watch                 # notes land here\"\nelse\n  dim \"  one-time setup left \u2014 you host your own tiny Cloudflare Worker so the\"\n  dim \"  secret (which lets a friend's note run on YOUR machine) is yours alone:\"\n  dim \"    https://github.com/merinids212/feedback#setup\"\nfi\n";
 
 // The slug in the URL *is* the credential. Without an explicit policy the browser sends
 // it as the Referer to any third-party host a friend clicks through to, handing the link
@@ -75,6 +75,13 @@ function authed(req, env) {
 
 // 9 chars from a 31-symbol alphabet ~= 44 bits — unguessable at any realistic rate,
 // and rejection-sampled so the modulo doesn't quietly favour the first 8 letters.
+// A link record holds the project name and the absolute path it routes to. It should not
+// outlive the link: expire it a week past its own expiry (min a day, KV's floor is 60s).
+function linkTtl(link) {
+  const secs = Math.ceil((link.expires - Date.now()) / 1000) + 7 * 86400;
+  return Math.max(86400, secs);
+}
+
 function slugify(n = 9) {
   const A = "abcdefghjkmnpqrstuvwxyz23456789";      // no look-alikes (i/l/o/0/1)
   const limit = 256 - (256 % A.length);
@@ -107,7 +114,7 @@ export default {
         expires: Date.now() + Math.min(Math.max(Number(b.days) || 7, 1), 90) * 86400e3,
         max: Math.min(Number(b.max) || 50, 500), count: 0, dead: false,
       };
-      await env.FEEDBACK.put(`link:${slug}`, JSON.stringify(link));
+      await env.FEEDBACK.put(`link:${slug}`, JSON.stringify(link), { expirationTtl: linkTtl(link) });
       return j({ slug, url: `https://feedback.cybercorpresearch.com/f/${slug}` });
     }
 
@@ -145,7 +152,10 @@ export default {
       if (!authed(req, env)) return j({ error: "unauthorized" }, 401);
       const b = await req.json();
       const link = await env.FEEDBACK.get(`link:${b.slug}`, "json");
-      if (link) { link.dead = true; await env.FEEDBACK.put(`link:${b.slug}`, JSON.stringify(link)); }
+      if (link) {
+        link.dead = true;
+        await env.FEEDBACK.put(`link:${b.slug}`, JSON.stringify(link), { expirationTtl: linkTtl(link) });
+      }
       return j({ ok: true });
     }
 
@@ -172,7 +182,7 @@ export default {
           text, from: String(b.from || "").slice(0, 60), ts: Date.now(),
         }), { expirationTtl: 30 * 86400 });
         link.count++;
-        await env.FEEDBACK.put(`link:${link.slug}`, JSON.stringify(link));
+        await env.FEEDBACK.put(`link:${link.slug}`, JSON.stringify(link), { expirationTtl: linkTtl(link) });
         return j({ ok: true });
       }
 
@@ -599,6 +609,8 @@ wrangler deploy</pre>
     <tr><td>timing-safe auth</td><td>The Worker compares the bearer token in <b>constant time</b>, so response latency can't be used to walk the secret byte by byte.</td></tr>
     <tr><td>the link can't leak sideways</td><td>The slug in the URL <em>is</em> the credential, so every page is served <code>referrer-policy: no-referrer</code> — click a link inside a note and the destination learns nothing about where you came from. Friend pages are also <code>no-store</code>, <code>DENY</code>-framed, <code>nosniff</code>, and under a CSP that permits only this page's own inline assets.</td></tr>
     <tr><td>bodies are capped before parsing</td><td>The public endpoint rejects anything over 16 KB with a 413 rather than buffering it — the 4,000-character limit applies after parsing, which is too late to matter.</td></tr>
+    <tr><td>nothing outlives its link</td><td>Notes expire from KV after 30 days; the link record — which carries the project name and the folder path it routes to — now expires a week after the link itself, instead of sitting there forever.</td></tr>
+    <tr><td>the installer checks before it wires</td><td><code>install.sh</code> stages both files, parses them, and only then moves them into place — a truncated download can't leave a broken <code>feedback.zsh</code> sourced by every new shell. Your <code>~/.zshrc</code> is backed up first.</td></tr>
     <tr><td>bounded blast radius</td><td>Notes are capped at 4,000 characters, trimmed further before an agent sees them, and expire from KV after 30 days. Links expire (7d default) and cap submissions (50 default). <code>feedback kill &lt;slug&gt;</code> ends one immediately.</td></tr>
   </table>
 
