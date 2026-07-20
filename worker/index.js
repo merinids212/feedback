@@ -288,7 +288,7 @@ textarea:focus-visible,input:focus-visible{outline:none}
 </div>
 <script>
 const T=document.getElementById("t"),CC=document.getElementById("cc"),PV=document.getElementById("pv");
-function esc(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function md(x){
   if(!x.trim())return '<span class="empty">nothing to preview yet</span>';
   var lines=x.split(/\\r?\\n/),out=[],ul=false;
@@ -305,7 +305,7 @@ function md(x){
 function inl(s){ s=esc(s);
   s=s.replace(/\`([^\`]+)\`/g,"<code>$1</code>");
   s=s.replace(/\\*\\*([^*]+)\\*\\*/g,"<strong>$1</strong>");
-  s=s.replace(/(https?:\\/\\/[^\\s]+)/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+  s=s.replace(/(https?:\\/\\/[^\\s"'<>]+)/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
   return s;
 }
 const SEND=document.getElementById("send"),SEND_LABEL=SEND?SEND.textContent:"send ↵";
@@ -618,7 +618,7 @@ wrangler deploy</pre>
   <table>
     <tr><td>no account, no tracking</td><td>The page asks for a note and an optional name. No sign-in, no cookies, no analytics, no IP logging beyond what Cloudflare does to serve the request.</td></tr>
     <tr><td>their words go one place</td><td>Straight to your inbox. Not to us, not to a model provider — until you choose to hand the note to your agent.</td></tr>
-    <tr><td>the page can't be turned on them</td><td>Everything rendered is escaped; the markdown preview only ever links <code>http(s)</code> URLs, so a note can't inject script into the page — theirs or anyone's.</td></tr>
+    <tr><td>the page can't be turned on them</td><td>Everything rendered is escaped — quotes included, so a URL typed as <code>https://x/&quot;onmouseover=&quot;…</code> can't break out of an attribute and run. The preview only linkifies <code>http(s)</code> URLs. A regression test renders the real page and fires injection probes at it.</td></tr>
     <tr><td>links are unguessable</td><td>9 characters from a 31-symbol alphabet (~44 bits), rejection-sampled so the randomness isn't skewed, and pages are <code>noindex</code>. Nobody stumbles onto your link.</td></tr>
   </table>
 

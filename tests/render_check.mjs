@@ -101,5 +101,41 @@ for (const [name, path] of [["home", "/"], ["friend", "/f/abcdefgh"], ["docs", "
   else { console.error(`  ✗ normal submission returned ${ok.status}`); fail++; }
 }
 
+// The preview renders whatever the sender typed. esc() ran before the autolinker but did
+// not escape quotes, so a URL like  https://x/"onmouseover="alert(1)  closed the href and
+// injected a handler — and CSP can't help, since script-src 'unsafe-inline' allows inline
+// handlers. The discriminator is a LITERAL quote after an attribute name; an entity-encoded
+// one is inert.
+{
+  const html = await render("/f/abcdefgh");
+  const script = /<script>([\s\S]*?)<\/script>/.exec(html)[1];
+  const ctx = vm.createContext({
+    document: { getElementById: () => null, addEventListener() {} },
+    matchMedia: () => ({ matches: true }), location: {}, navigator: {},
+  });
+  vm.runInContext(script.replace(/\bconst /g, "var ").replace(/\blet /g, "var "), ctx);
+
+  const probes = [
+    'https://x.com/"onmouseover="alert(1)',
+    "https://x.com/'onmouseover='alert(1)",
+    "<img src=x onerror=alert(1)>",
+    "<script>alert(1)</" + "script>",
+  ];
+  let clean = true;
+  for (const probe of probes) {
+    const out = vm.runInContext("inl(" + JSON.stringify(probe) + ")", ctx);
+    // a raw < from the input, or an event handler with a real quote, means it escaped
+    if (/<(img|script)/i.test(out) || /\bon\w+=["']/.test(out)) {
+      console.error(`  ✗ preview renderer injected on: ${probe} -> ${out.slice(0, 90)}`);
+      clean = false; fail++;
+    }
+  }
+  if (clean) console.log("  ✓ preview renderer neutralises quote/tag injection");
+
+  const link = vm.runInContext('inl("see https://good.example/x")', ctx);
+  if (/<a href="https:\/\/good\.example\/x"/.test(link)) console.log("  ✓ ordinary links still linkify");
+  else { console.error("  ✗ ordinary links broke: " + link); fail++; }
+}
+
 console.log(fail ? `\nrender_check: ${fail} FAILED` : "\nrender_check: all inline scripts parse");
 process.exit(fail ? 1 : 0);

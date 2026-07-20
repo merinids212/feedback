@@ -11,5 +11,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
       - name: offline suite (syntax + parse)
         run: bash tests/run_tests.sh --offline
+      # `|| true` meant this step could never fail — a lint that can't fail isn't a lint.
+      # feedback.zsh is zsh, which shellcheck can't parse; zsh -n covers it in the suite.
       - name: shellcheck
-        run: shellcheck site/install.sh statusline.sh cli/feedback.zsh || true
+        run: shellcheck --severity=warning site/install.sh statusline.sh

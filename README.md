@@ -115,8 +115,9 @@ here is exactly what is and isn't protected.
 
 - No account, no cookies, no analytics. A note and an optional name, nothing else.
 - Their words go to your inbox — not to us, not to a model provider until you hand it over.
-- Everything rendered is escaped and the preview only links `http(s)` URLs, so the page can't be
-  turned into an attack on them.
+- Everything rendered is escaped — quotes included, so a URL typed as `https://x/"onmouseover="…`
+  can't break out of an attribute and run. The preview only linkifies `http(s)` URLs, and a
+  regression test fires injection probes at the real rendered page.
 - Links are ~44 bits of rejection-sampled randomness and the pages are `noindex`.
 
 **What it does not protect against**
