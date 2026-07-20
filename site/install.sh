@@ -5,8 +5,8 @@ set -euo pipefail
 RAW="https://raw.githubusercontent.com/merinids212/feedback/main/cli"
 DEST="$HOME/.claude/feedback"
 
-gld(){ printf '\033[38;5;255m%s\033[0m\n' "$1"; }
-dim(){ printf '\033[38;5;245m%s\033[0m\n' "$1"; }
+gld(){ printf '\033[38;5;230m%s\033[0m\n' "$1"; }
+dim(){ printf '\033[38;5;187m%s\033[0m\n' "$1"; }
 err(){ printf '\033[38;5;203m%s\033[0m\n' "$1" >&2; }
 
 gld "◇ installing feedback (local watcher)"

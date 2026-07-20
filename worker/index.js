@@ -11,17 +11,17 @@
 const MAX_TEXT = 4000;
 // brand favicon: white tile + black diamond (the ◈ feedback mark). inline, no extra request.
 const FAVICON = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' +
-  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#f4f4f4"/><path d="M16 7L25 16L16 25L7 16Z" fill="#000000"/></svg>') +
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#f1ebe0"/><path d="M16 7L25 16L16 25L7 16Z" fill="#080706"/></svg>') +
   '">';
 
 // ── feedback tokens ── monochrome, dark only. The single chromatic value is CLAUDE:
 // each agent's own mark, spent only where that agent is named.
-const TOKENS = `:root{--bg:#000000;--panel:#070707;--ink:#f4f4f4;--dim:#9a9a9a;--faint:#757575;
---line:#191919;--border:#2a2a2a;--hi:#ffffff;--prose:#c9c9c9;--claude:#d97757}`;
+const TOKENS = `:root{--bg:#080706;--panel:#100e0b;--ink:#f1ebe0;--dim:#a79e92;--faint:#837a6e;
+--line:#211d18;--border:#322d26;--hi:#fff9f0;--prose:#d6cec2;--claude:#d97757}`;
 
 // inline code renders as a chip on both products' docs — a command inside a sentence
 // should be scannable, and never mistaken for emphasis.
-const CODE_CHIP = `code{color:var(--hi);background:rgba(255,255,255,.07);border:1px solid var(--line);
+const CODE_CHIP = `code{color:var(--hi);background:rgba(255,244,228,.07);border:1px solid var(--line);
 border-radius:3px;padding:.5px 5px;font-size:.92em;white-space:nowrap}
 pre code{background:none;border:0;padding:0;font-size:inherit}`;
 // agent marks — Claude's sunburst in its own coral, Codex's blossom in mono (that IS its color).
@@ -32,7 +32,7 @@ const AGENT_MARKS = `<span class="agents">${CLAUDE_MARK}${CODEX_MARK}</span>`;
 const MARK_CSS = `.lg{width:17px;height:17px;flex:none;vertical-align:-3px}
 .lgc{color:var(--claude)}.lgx{color:var(--ink)}
 .agents{display:inline-flex;gap:7px;align-items:center;vertical-align:-3px;margin-left:5px}`;
-const INSTALL_SH = "#!/usr/bin/env bash\n# feedback \u2014 install the local watcher.  Usage:\n#   curl -fsSL https://feedback.cybercorpresearch.com/install.sh | bash\nset -euo pipefail\nRAW=\"https://raw.githubusercontent.com/merinids212/feedback/main/cli\"\nDEST=\"$HOME/.claude/feedback\"\n\ngld(){ printf '\\033[38;5;255m%s\\033[0m\\n' \"$1\"; }\ndim(){ printf '\\033[38;5;245m%s\\033[0m\\n' \"$1\"; }\nerr(){ printf '\\033[38;5;203m%s\\033[0m\\n' \"$1\" >&2; }\n\ngld \"\u25c7 installing feedback (local watcher)\"\ncommand -v python3 >/dev/null || { err \"python3 required\"; exit 1; }\ncommand -v zsh     >/dev/null || { err \"zsh required (feedback is a zsh function)\"; exit 1; }\n\nmkdir -p \"$DEST\"\nfor f in fb.py feedback.zsh; do curl -fsSL \"$RAW/$f\" -o \"$DEST/$f\"; done\n\nLINE=\"source $DEST/feedback.zsh\"\nRC=\"$HOME/.zshrc\"\nif [ -f \"$RC\" ] && grep -qF \"$LINE\" \"$RC\"; then\n  dim \"  ~/.zshrc already sources feedback\"\nelse\n  printf '\\n# feedback \u2014 notes from friends tunnel into your coding agent\\n%s\\n' \"$LINE\" >> \"$RC\"\n  dim \"  wired into ~/.zshrc\"\nfi\n\ngld \"\u25c7 watcher installed\"\nif [ -s \"$DEST/secret\" ]; then\n  dim \"  secret present \u2014 you're ready. open a new terminal, then:\"\n  dim \"    feedback link                  # from your project dir — copies the URL\"\n  dim \"    feedback watch                 # notes land here\"\nelse\n  dim \"  one-time setup left \u2014 you host your own tiny Cloudflare Worker so the\"\n  dim \"  secret (which lets a friend's note run on YOUR machine) is yours alone:\"\n  dim \"    https://github.com/merinids212/feedback#setup\"\nfi\n";
+const INSTALL_SH = "#!/usr/bin/env bash\n# feedback \u2014 install the local watcher.  Usage:\n#   curl -fsSL https://feedback.cybercorpresearch.com/install.sh | bash\nset -euo pipefail\nRAW=\"https://raw.githubusercontent.com/merinids212/feedback/main/cli\"\nDEST=\"$HOME/.claude/feedback\"\n\ngld(){ printf '\\033[38;5;230m%s\\033[0m\\n' \"$1\"; }\ndim(){ printf '\\033[38;5;187m%s\\033[0m\\n' \"$1\"; }\nerr(){ printf '\\033[38;5;203m%s\\033[0m\\n' \"$1\" >&2; }\n\ngld \"\u25c7 installing feedback (local watcher)\"\ncommand -v python3 >/dev/null || { err \"python3 required\"; exit 1; }\ncommand -v zsh     >/dev/null || { err \"zsh required (feedback is a zsh function)\"; exit 1; }\n\nmkdir -p \"$DEST\"\nfor f in fb.py feedback.zsh; do curl -fsSL \"$RAW/$f\" -o \"$DEST/$f\"; done\n\nLINE=\"source $DEST/feedback.zsh\"\nRC=\"$HOME/.zshrc\"\nif [ -f \"$RC\" ] && grep -qF \"$LINE\" \"$RC\"; then\n  dim \"  ~/.zshrc already sources feedback\"\nelse\n  printf '\\n# feedback \u2014 notes from friends tunnel into your coding agent\\n%s\\n' \"$LINE\" >> \"$RC\"\n  dim \"  wired into ~/.zshrc\"\nfi\n\ngld \"\u25c7 watcher installed\"\nif [ -s \"$DEST/secret\" ]; then\n  dim \"  secret present \u2014 you're ready. open a new terminal, then:\"\n  dim \"    feedback link                  # from your project dir — copies the URL\"\n  dim \"    feedback watch                 # notes land here\"\nelse\n  dim \"  one-time setup left \u2014 you host your own tiny Cloudflare Worker so the\"\n  dim \"  secret (which lets a friend's note run on YOUR machine) is yours alone:\"\n  dim \"    https://github.com/merinids212/feedback#setup\"\nfi\n";
 
 function j(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -177,7 +177,7 @@ function page(link, alive) {
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="feedback → ${project}">
 <meta name="twitter:description" content="Drop a note — it lands in ${project}'s dev session, as a prompt for their coding agent.">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#080706">
 <style>
 ${TOKENS}
 *{box-sizing:border-box}
@@ -186,7 +186,7 @@ display:flex;min-height:100svh;align-items:center;justify-content:center;padding
 .card{position:relative;z-index:1;width:100%;max-width:560px}
 pre.wm{margin:0 0 7px;display:block;width:-moz-fit-content;width:fit-content;text-align:left;white-space:pre;
 line-height:1.04;font-size:clamp(5px,1.7vw,10.5px);font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-background:linear-gradient(180deg,#ffffff,#6a6a6a);
+background:linear-gradient(180deg,#fff9f0,#6b6259);
 -webkit-background-clip:text;background-clip:text;color:transparent}
 .arw{color:var(--dim);font-size:13.5px;letter-spacing:.02em;margin:0 0 14px}.arw b{color:var(--hi);font-weight:400}
 .dim{color:var(--dim);font-size:13.5px} .dim b{color:var(--ink);font-weight:400}
@@ -215,7 +215,7 @@ textarea:focus-visible,input:focus-visible{outline:none}
 .ed textarea{border:0;margin:0;min-height:170px;line-height:1.6;background:transparent}
 .pv{min-height:170px;padding:12px;font-size:14px;line-height:1.6;color:var(--ink);overflow-y:auto}
 .pv h1,.pv h2,.pv h3{color:var(--hi);font-size:15px;margin:.6em 0 .3em}
-.pv code{background:rgba(255,255,255,.08);padding:1px 5px;color:var(--ink)}
+.pv code{background:rgba(255,244,228,.08);padding:1px 5px;color:var(--ink)}
 .pv a{color:var(--hi)}.pv ul{margin:.4em 0;padding-left:1.2em}.pv strong{color:var(--ink)}
 .pv .empty{color:var(--faint)}
 .foot{margin-top:26px;color:var(--faint);font-size:11.5px;text-align:center}
@@ -295,7 +295,7 @@ function home() {
 <meta name="description" content="A link you hand a friend. They type a note. It tunnels into a coding-agent session on your machine — Claude Code, Codex, whatever you run — and lands as a prompt.">
 <meta property="og:title" content="feedback">
 <meta property="og:description" content="A link you hand a friend — their note tunnels straight into your coding agent.">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#080706">
 <style>
 ${TOKENS}
 *{box-sizing:border-box}
@@ -306,7 +306,7 @@ display:flex;align-items:flex-start;justify-content:center;padding:24px}
 a{color:var(--hi);text-decoration:none}a:hover{text-decoration:underline}
 pre.wm{margin:0 auto;display:block;width:-moz-fit-content;width:fit-content;text-align:left;white-space:pre;line-height:1.04;
 font-size:clamp(5.5px,1.9vw,13px);font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-background:linear-gradient(180deg,#ffffff,#6a6a6a);
+background:linear-gradient(180deg,#fff9f0,#6b6259);
 -webkit-background-clip:text;background-clip:text;color:transparent}
 .tag{color:var(--dim);margin:16px auto 0;max-width:520px;text-align:center}.tag b{color:var(--ink);font-weight:400}
 /* agent marks — the one place this page spends color, each in its own real color */
@@ -446,7 +446,7 @@ function docs() {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>feedback docs</title>${FAVICON}
 <meta name="description" content="feedback — setup, commands, how it works, and safety.">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#080706">
 <style>
 ${TOKENS}
 *{box-sizing:border-box}

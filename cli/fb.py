@@ -119,7 +119,7 @@ def main():
                 [sys.executable, os.path.abspath(__file__), "_refresh"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if n and n > 0:
-            print("\033[38;5;255m\u25c8 %d feedback\033[0m" % n)
+            print("\033[38;5;230m\u25c8 %d feedback\033[0m" % n)
         # else: print nothing
     elif cmd == "_refresh":
         try:

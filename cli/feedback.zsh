@@ -51,18 +51,18 @@ feedback() {
       [[ -d "$dir" ]] || { print -u2 "feedback: no such dir: $dir"; return 1 }
       local url
       url=$(eval "$py new ${(q)$(basename $dir)} ${(q)dir} $days $max") || return 1
-      print -P "%F{255}◇ feedback link%f ($(basename $dir) · ${days}d)"
+      print -P "%F{230}◇ feedback link%f ($(basename $dir) · ${days}d)"
       print "  $url"
-      if command -v pbcopy >/dev/null; then print -n "$url" | pbcopy; print -P "  %F{245}copied to clipboard%f"; fi
+      if command -v pbcopy >/dev/null; then print -n "$url" | pbcopy; print -P "  %F{187}copied to clipboard%f"; fi
       ;;
 
     ls)
-      print -P "%F{255}── links ──%f"
+      print -P "%F{230}── links ──%f"
       eval "$py links" | while IFS=$'\t' read -r slug proj cnt left state; do
         print "  $slug  ${(r:16:)proj} $cnt  $left  $state"
       done
       local n=$(eval "$py inbox" | wc -l | tr -d ' ')
-      print -P "%F{255}── inbox ──%f  $n waiting"
+      print -P "%F{230}── inbox ──%f  $n waiting"
       ;;
 
     kill)
@@ -84,7 +84,7 @@ feedback() {
         print -u2 "feedback: no agent found. Install claude or codex, or set FEEDBACK_AGENT / FEEDBACK_CMD."
         return 1
       fi
-      print -P "%F{255}◇ feedback watch%f %F{245}via ${agent[1]}%f $( ((auto)) && print -- '— auto-fire' || print -- '— Enter fires each note' ) (^C stops)"
+      print -P "%F{230}◇ feedback watch%f %F{187}via ${agent[1]}%f $( ((auto)) && print -- '— auto-fire' || print -- '— Enter fires each note' ) (^C stops)"
       while true; do
         local -a items
         items=("${(@f)$(eval "$py inbox" 2>/dev/null)}")
@@ -96,11 +96,11 @@ feedback() {
           text="${text//\\n/
 }"
           print ""
-          print -P "%F{255}◈ feedback%f on %F{252}$proj%f from %F{245}$from%f"
+          print -P "%F{230}◈ feedback%f on %F{223}$proj%f from %F{187}$from%f"
           print -- "$text" | sed 's/^/  │ /'
           local go=1
           if (( ! auto )); then
-            print -Pn "%F{245}↵ run in ${agent[1]} · s skip · q quit%f "
+            print -Pn "%F{187}↵ run in ${agent[1]} · s skip · q quit%f "
             local key; read -k1 key < /dev/tty; print ""
             [[ "$key" == "q" ]] && return 0
             [[ "$key" == "s" ]] && go=0
@@ -114,12 +114,12 @@ $text
 \"\"\""
             local rundir="$PWD"
             if [[ -d "$cwd" ]]; then rundir="$cwd"
-            else print -P "%F{245}  (project dir $cwd is gone — running in $PWD)%f"; fi
-            print -P "%F{252}▸ launching ${agent[1]}%f in $rundir"
+            else print -P "%F{187}  (project dir $cwd is gone — running in $PWD)%f"; fi
+            print -P "%F{223}▸ launching ${agent[1]}%f in $rundir"
             ( cd "$rundir" && "${agent[@]}" "${flags[@]}" "$prompt" )
           fi
           eval "$py ack ${(q)id}"
-          print -P "%F{245}◇ handled — watching again%f"
+          print -P "%F{187}◇ handled — watching again%f"
         done
         sleep 4
       done

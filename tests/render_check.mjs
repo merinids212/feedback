@@ -57,10 +57,13 @@ for (const [name, path] of [["home", "/"], ["friend", "/f/abcdefgh"], ["docs", "
   const chromatic = [...new Set([...html.matchAll(/#([0-9a-fA-F]{6})\b/g)].map(m => m[1].toLowerCase()))]
     .filter(h => {
       const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
-      return Math.max(r, g, b) - Math.min(r, g, b) > 12 && h !== "d97757";
+      const spread = Math.max(r, g, b) - Math.min(r, g, b);
+      // warm neutrals are the brand; the absolute floor keeps dark tints (where a small
+      // spread is a large ratio) from tripping the check. Claude's coral is the exception.
+      return spread > Math.max(18, 0.18 * Math.max(r, g, b)) && h !== "d97757";
     });
-  if (chromatic.length) { console.error(`  ✗ ${name} is not monochrome: #${chromatic.join(", #")}`); fail++; }
-  else console.log(`  ✓ ${name} is monochrome (Claude coral aside)`);
+  if (chromatic.length) { console.error(`  ✗ ${name} has off-brand color: #${chromatic.join(", #")}`); fail++; }
+  else console.log(`  ✓ ${name} is warm-neutral (Claude coral aside)`);
 }
 
 console.log(fail ? `\nrender_check: ${fail} FAILED` : "\nrender_check: all inline scripts parse");
