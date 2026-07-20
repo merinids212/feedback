@@ -9,6 +9,7 @@
 //   POST /f/:slug    {text, from?} -> {ok}
 
 const MAX_TEXT = 4000;
+const MAX_BODY = 16 * 1024;   // hard ceiling on an unauthenticated request body
 // brand favicon: white tile + black diamond (the ◈ feedback mark). inline, no extra request.
 const FAVICON = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' +
   encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#f1ebe0"/><path d="M16 7L25 16L16 25L7 16Z" fill="#0f0e0e"/></svg>') +
@@ -33,6 +34,22 @@ const MARK_CSS = `.lg{width:17px;height:17px;flex:none;vertical-align:-3px}
 .lgc{color:var(--claude)}.lgx{color:var(--ink)}
 .agents{display:inline-flex;gap:7px;align-items:center;vertical-align:-3px;margin-left:5px}`;
 const INSTALL_SH = "#!/usr/bin/env bash\n# feedback \u2014 install the local watcher.  Usage:\n#   curl -fsSL https://feedback.cybercorpresearch.com/install.sh | bash\nset -euo pipefail\nRAW=\"https://raw.githubusercontent.com/merinids212/feedback/main/cli\"\nDEST=\"$HOME/.claude/feedback\"\n\ngld(){ printf '\\033[38;5;230m%s\\033[0m\\n' \"$1\"; }\ndim(){ printf '\\033[38;5;187m%s\\033[0m\\n' \"$1\"; }\nerr(){ printf '\\033[38;5;203m%s\\033[0m\\n' \"$1\" >&2; }\n\ngld \"\u25c7 installing feedback (local watcher)\"\ncommand -v python3 >/dev/null || { err \"python3 required\"; exit 1; }\ncommand -v zsh     >/dev/null || { err \"zsh required (feedback is a zsh function)\"; exit 1; }\n\nmkdir -p \"$DEST\"\nfor f in fb.py feedback.zsh; do curl -fsSL \"$RAW/$f\" -o \"$DEST/$f\"; done\n\nLINE=\"source $DEST/feedback.zsh\"\nRC=\"$HOME/.zshrc\"\nif [ -f \"$RC\" ] && grep -qF \"$LINE\" \"$RC\"; then\n  dim \"  ~/.zshrc already sources feedback\"\nelse\n  printf '\\n# feedback \u2014 notes from friends tunnel into your coding agent\\n%s\\n' \"$LINE\" >> \"$RC\"\n  dim \"  wired into ~/.zshrc\"\nfi\n\ngld \"\u25c7 watcher installed\"\nif [ -s \"$DEST/secret\" ]; then\n  dim \"  secret present \u2014 you're ready. open a new terminal, then:\"\n  dim \"    feedback link                  # from your project dir — copies the URL\"\n  dim \"    feedback watch                 # notes land here\"\nelse\n  dim \"  one-time setup left \u2014 you host your own tiny Cloudflare Worker so the\"\n  dim \"  secret (which lets a friend's note run on YOUR machine) is yours alone:\"\n  dim \"    https://github.com/merinids212/feedback#setup\"\nfi\n";
+
+// The slug in the URL *is* the credential. Without an explicit policy the browser sends
+// it as the Referer to any third-party host a friend clicks through to, handing the link
+// to a stranger. no-referrer stops that; the rest is standard hardening for a page an
+// outsider loads: no framing (clickjack a friend into submitting), no MIME sniffing, and
+// a CSP that allows only this page's own inline style/script and nothing off-host.
+const HTML_HEADERS = {
+  "content-type": "text/html; charset=utf-8",
+  "referrer-policy": "no-referrer",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "content-security-policy":
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; " +
+    "img-src data:; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; " +
+    "connect-src 'self'",
+};
 
 function j(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -87,7 +104,7 @@ export default {
       const link = {
         slug, project: String(b.project).slice(0, 60), cwd: String(b.cwd).slice(0, 300),
         created: Date.now(),
-        expires: Date.now() + (Number(b.days) || 7) * 86400e3,
+        expires: Date.now() + Math.min(Math.max(Number(b.days) || 7, 1), 90) * 86400e3,
         max: Math.min(Number(b.max) || 50, 500), count: 0, dead: false,
       };
       await env.FEEDBACK.put(`link:${slug}`, JSON.stringify(link));
@@ -139,7 +156,14 @@ export default {
 
       if (req.method === "POST") {
         if (!alive) return j({ error: "this link is no longer active" }, 410);
-        const b = await req.json().catch(() => ({}));
+        // MAX_TEXT is enforced after parsing, which is too late: json() buffers whatever
+        // arrives. Anyone with the link could otherwise push megabytes through it.
+        const len = Number(req.headers.get("content-length") || 0);
+        if (len > MAX_BODY) return j({ error: "too long" }, 413);
+        const raw = await req.text();
+        if (raw.length > MAX_BODY) return j({ error: "too long" }, 413);
+        let b = {};
+        try { b = JSON.parse(raw); } catch { b = {}; }
         const text = String(b.text || "").slice(0, MAX_TEXT).trim();
         if (!text) return j({ error: "empty" }, 400);
         const id = `${Date.now()}-${slugify().slice(0, 5)}`;
@@ -153,19 +177,16 @@ export default {
       }
 
       return new Response(page(link, alive), {
-        headers: { "content-type": "text/html; charset=utf-8" },
+        // a friend page is per-link and short-lived: never let an intermediary keep a copy
+        headers: { ...HTML_HEADERS, "cache-control": "no-store" },
       });
     }
 
     if (p === "/install.sh") return new Response(INSTALL_SH, {
       headers: { "content-type": "text/x-shellscript; charset=utf-8" },
     });
-    if (p === "/docs") return new Response(docs(), {
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
-    if (p === "/") return new Response(home(), {
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
+    if (p === "/docs") return new Response(docs(), { headers: HTML_HEADERS });
+    if (p === "/") return new Response(home(), { headers: HTML_HEADERS });
     return new Response("not found", { status: 404 });
   },
 };
@@ -274,7 +295,7 @@ function md(x){
 function inl(s){ s=esc(s);
   s=s.replace(/\`([^\`]+)\`/g,"<code>$1</code>");
   s=s.replace(/\\*\\*([^*]+)\\*\\*/g,"<strong>$1</strong>");
-  s=s.replace(/(https?:\\/\\/[^\\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
+  s=s.replace(/(https?:\\/\\/[^\\s]+)/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
   return s;
 }
 const SEND=document.getElementById("send"),SEND_LABEL=SEND?SEND.textContent:"send ↵";
@@ -576,6 +597,8 @@ wrangler deploy</pre>
     <tr><td>confirm mode by default</td><td>Without <code>--auto</code>, every note waits for your <code>↵</code>, and you see the full text first. Prompt-injection defence is layered, not absolute — the human in the loop is the last layer.</td></tr>
     <tr><td>your inbox, your secret</td><td>You host the Worker, so notes live in <b>your</b> Cloudflare KV. The bearer secret stays in <code>~/.claude/feedback/secret</code> (chmod 600 — the CLI warns if it's group- or world-readable) and in the Worker env. It is never in the repo and never sent to a third party.</td></tr>
     <tr><td>timing-safe auth</td><td>The Worker compares the bearer token in <b>constant time</b>, so response latency can't be used to walk the secret byte by byte.</td></tr>
+    <tr><td>the link can't leak sideways</td><td>The slug in the URL <em>is</em> the credential, so every page is served <code>referrer-policy: no-referrer</code> — click a link inside a note and the destination learns nothing about where you came from. Friend pages are also <code>no-store</code>, <code>DENY</code>-framed, <code>nosniff</code>, and under a CSP that permits only this page's own inline assets.</td></tr>
+    <tr><td>bodies are capped before parsing</td><td>The public endpoint rejects anything over 16 KB with a 413 rather than buffering it — the 4,000-character limit applies after parsing, which is too late to matter.</td></tr>
     <tr><td>bounded blast radius</td><td>Notes are capped at 4,000 characters, trimmed further before an agent sees them, and expire from KV after 30 days. Links expire (7d default) and cap submissions (50 default). <code>feedback kill &lt;slug&gt;</code> ends one immediately.</td></tr>
   </table>
 

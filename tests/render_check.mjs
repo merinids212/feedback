@@ -14,7 +14,8 @@ const worker = (await import("data:text/javascript," + encodeURIComponent(src)))
 
 const link = { slug: "abcdefgh", project: "demoapp", cwd: "/tmp/demoapp",
   created: 0, expires: 2e12, max: 9, count: 0, dead: false };
-const env = { FEEDBACK: { get: async () => link }, SECRET: "test" };
+// put/delete are no-ops: the submission path writes, and we only care about the response
+const env = { FEEDBACK: { get: async () => link, put: async () => {}, delete: async () => {} }, SECRET: "test" };
 
 const render = async (path) =>
   (await worker.fetch(new Request("https://feedback.example" + path), env)).text();
@@ -64,6 +65,40 @@ for (const [name, path] of [["home", "/"], ["friend", "/f/abcdefgh"], ["docs", "
     });
   if (chromatic.length) { console.error(`  ✗ ${name} has off-brand color: #${chromatic.join(", #")}`); fail++; }
   else console.log(`  ✓ ${name} is warm-neutral (Claude coral aside)`);
+}
+
+// the friend page is loaded by someone who isn't us: the slug in its URL is a credential,
+// so it must not leak as a Referer, be framed, be sniffed, or be cached by an intermediary
+{
+  const r = await worker.fetch(new Request("https://feedback.example/f/abcdefgh"), env);
+  const want = {
+    "referrer-policy": "no-referrer",
+    "x-frame-options": "DENY",
+    "x-content-type-options": "nosniff",
+    "cache-control": "no-store",
+  };
+  for (const [h, v] of Object.entries(want)) {
+    if (r.headers.get(h) === v) console.log(`  ✓ friend page sets ${h}: ${v}`);
+    else { console.error(`  ✗ friend page ${h} = ${r.headers.get(h)} (want ${v})`); fail++; }
+  }
+  const csp = r.headers.get("content-security-policy") || "";
+  if (csp.includes("default-src 'none'") && csp.includes("frame-ancestors 'none'"))
+    console.log("  ✓ friend page CSP locks the page to its own inline assets");
+  else { console.error("  ✗ friend page CSP too permissive: " + csp); fail++; }
+
+  // MAX_TEXT is applied after parsing, so the body itself needs a ceiling
+  const big = await worker.fetch(new Request("https://feedback.example/f/abcdefgh", {
+    method: "POST", headers: { "content-length": "2000000" },
+    body: JSON.stringify({ text: "x".repeat(30000) }),
+  }), env);
+  if (big.status === 413) console.log("  ✓ oversized submission rejected before parsing (413)");
+  else { console.error(`  ✗ oversized submission returned ${big.status}`); fail++; }
+
+  const ok = await worker.fetch(new Request("https://feedback.example/f/abcdefgh", {
+    method: "POST", body: JSON.stringify({ text: "the export button does nothing" }),
+  }), env);
+  if (ok.status === 200) console.log("  ✓ a normal submission still goes through");
+  else { console.error(`  ✗ normal submission returned ${ok.status}`); fail++; }
 }
 
 console.log(fail ? `\nrender_check: ${fail} FAILED` : "\nrender_check: all inline scripts parse");

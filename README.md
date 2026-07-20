@@ -98,6 +98,11 @@ here is exactly what is and isn't protected.
 - **Your inbox, your secret.** You host the Worker, so notes live in your Cloudflare KV. The
   bearer secret stays in `~/.claude/feedback/secret` (chmod 600 — the CLI warns if it's readable
   by others) and the Worker env. The Worker compares it in constant time.
+- **The link can't leak sideways.** The slug is the credential, so pages ship
+  `referrer-policy: no-referrer` (a link inside a note can't tell its destination where the
+  visitor came from), plus `no-store`, `x-frame-options: DENY`, `nosniff`, and a CSP that
+  allows only the page's own inline assets.
+- **Bodies are capped before parsing** — over 16 KB gets a 413 instead of being buffered.
 - **Bounded.** Notes cap at 4,000 chars, trim before an agent sees them, and expire from KV after
   30 days. Links expire (7d) and cap submissions (50). `feedback kill <slug>` ends one instantly.
 
