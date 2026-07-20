@@ -78,12 +78,45 @@ See pending feedback while you code, without checking. Add to `~/.claude/setting
 Shows `dir · branch · model` plus `◈ N feedback` when notes are waiting (silent otherwise).
 Cached + refreshed in the background, so it never slows your prompt.
 
-## Safety
+## Safety & security
 
-The friend page is `noindex` and links are unguessable, expiring (7d default), and
-submission-capped. The secret lives only in `~/.claude/feedback/secret` (chmod 600) and
-the Worker's env — never in the repo. Still: this executes remote-authored prompts on
-your machine. Keep confirm mode on unless you fully trust who has the link.
+Feedback connects a stranger's typing to an agent on your machine — that's the product, so
+here is exactly what is and isn't protected.
+
+**For you, running it**
+
+- **A note is data, not orders.** Each one is fenced with a random per-run tag and labelled as
+  an outsider's report, so a sender who types the fence characters can't close the quote early
+  and start giving instructions.
+- **Bypass flags are never inherited.** `PORTAL_FLAGS` is borrowed for convenience with
+  `--dangerously-skip-permissions` (and `--yolo`, `--full-auto`) stripped out. Your own sessions
+  may skip approvals; a stranger's note does not. An explicit `FEEDBACK_FLAGS` is still honoured.
+- **`--auto` + a bypass flag is refused** unless you set `FEEDBACK_I_TRUST_THE_LINK=1`. Unattended
+  and unsandboxed is remote code execution for whoever holds the link.
+- **Confirm mode is the default** — you read every note and press `↵` before anything runs.
+  Injection defence is layered, not absolute; you are the last layer.
+- **Your inbox, your secret.** You host the Worker, so notes live in your Cloudflare KV. The
+  bearer secret stays in `~/.claude/feedback/secret` (chmod 600 — the CLI warns if it's readable
+  by others) and the Worker env. The Worker compares it in constant time.
+- **Bounded.** Notes cap at 4,000 chars, trim before an agent sees them, and expire from KV after
+  30 days. Links expire (7d) and cap submissions (50). `feedback kill <slug>` ends one instantly.
+
+**For your friend, sending**
+
+- No account, no cookies, no analytics. A note and an optional name, nothing else.
+- Their words go to your inbox — not to us, not to a model provider until you hand it over.
+- Everything rendered is escaped and the preview only links `http(s)` URLs, so the page can't be
+  turned into an attack on them.
+- Links are ~44 bits of rejection-sampled randomness and the pages are `noindex`.
+
+**What it does not protect against**
+
+- A hostile note is still a prompt. Fencing raises the bar; it isn't a proof.
+- Anyone with the link can write to your inbox until it expires or caps out — the link *is* the
+  credential.
+- Each note carries the project's folder path (that's how routing works). It's in your own KV,
+  but it is a path off your machine.
+- No per-IP rate limiting; the submission cap is what bounds abuse.
 
 ## Development
 

@@ -11,13 +11,13 @@
 const MAX_TEXT = 4000;
 // brand favicon: white tile + black diamond (the ◈ feedback mark). inline, no extra request.
 const FAVICON = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' +
-  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#f1ebe0"/><path d="M16 7L25 16L16 25L7 16Z" fill="#080706"/></svg>') +
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#f1ebe0"/><path d="M16 7L25 16L16 25L7 16Z" fill="#0f0e0e"/></svg>') +
   '">';
 
 // ── feedback tokens ── monochrome, dark only. The single chromatic value is CLAUDE:
 // each agent's own mark, spent only where that agent is named.
-const TOKENS = `:root{--bg:#080706;--panel:#100e0b;--ink:#f1ebe0;--dim:#a79e92;--faint:#837a6e;
---line:#211d18;--border:#322d26;--hi:#fff9f0;--prose:#d6cec2;--claude:#d97757}`;
+const TOKENS = `:root{--bg:#0f0e0e;--panel:#191614;--ink:#f1ebe0;--dim:#a79e92;--faint:#837a6e;
+--line:#282320;--border:#3a342f;--hi:#fff9f0;--prose:#d6cec2;--claude:#d97757}`;
 
 // inline code renders as a chip on both products' docs — a command inside a sentence
 // should be scannable, and never mistaken for emphasis.
@@ -40,15 +40,38 @@ function j(data, status = 200) {
   });
 }
 
-function authed(req, env) {
-  const h = req.headers.get("authorization") || "";
-  return h === `Bearer ${env.SECRET}`;
+// Constant-time compare: a plain === leaks how many leading bytes matched through
+// response timing, which is enough to walk a secret one byte at a time over many tries.
+function safeEqual(a, b) {
+  const ea = new TextEncoder().encode(a), eb = new TextEncoder().encode(b);
+  if (ea.length !== eb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ea.length; i++) diff |= ea[i] ^ eb[i];
+  return diff === 0;
 }
 
-function slugify() {
-  const a = new Uint8Array(9);
-  crypto.getRandomValues(a);
-  return [...a].map(b => "abcdefghjkmnpqrstuvwxyz23456789"[b % 31]).join("");
+function authed(req, env) {
+  const h = req.headers.get("authorization") || "";
+  if (!env.SECRET) return false;            // never authorize against an unset secret
+  return safeEqual(h, `Bearer ${env.SECRET}`);
+}
+
+// 9 chars from a 31-symbol alphabet ~= 44 bits — unguessable at any realistic rate,
+// and rejection-sampled so the modulo doesn't quietly favour the first 8 letters.
+function slugify(n = 9) {
+  const A = "abcdefghjkmnpqrstuvwxyz23456789";      // no look-alikes (i/l/o/0/1)
+  const limit = 256 - (256 % A.length);
+  let out = "";
+  while (out.length < n) {
+    const buf = new Uint8Array(n * 2);
+    crypto.getRandomValues(buf);
+    for (const b of buf) {
+      if (b >= limit) continue;
+      out += A[b % A.length];
+      if (out.length === n) break;
+    }
+  }
+  return out;
 }
 
 export default {
@@ -177,7 +200,7 @@ function page(link, alive) {
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="feedback → ${project}">
 <meta name="twitter:description" content="Drop a note — it lands in ${project}'s dev session, as a prompt for their coding agent.">
-<meta name="theme-color" content="#080706">
+<meta name="theme-color" content="#0f0e0e">
 <style>
 ${TOKENS}
 *{box-sizing:border-box}
@@ -295,7 +318,7 @@ function home() {
 <meta name="description" content="A link you hand a friend. They type a note. It tunnels into a coding-agent session on your machine — Claude Code, Codex, whatever you run — and lands as a prompt.">
 <meta property="og:title" content="feedback">
 <meta property="og:description" content="A link you hand a friend — their note tunnels straight into your coding agent.">
-<meta name="theme-color" content="#080706">
+<meta name="theme-color" content="#0f0e0e">
 <style>
 ${TOKENS}
 *{box-sizing:border-box}
@@ -446,7 +469,7 @@ function docs() {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>feedback docs</title>${FAVICON}
 <meta name="description" content="feedback — setup, commands, how it works, and safety.">
-<meta name="theme-color" content="#080706">
+<meta name="theme-color" content="#0f0e0e">
 <style>
 ${TOKENS}
 *{box-sizing:border-box}
@@ -485,7 +508,7 @@ ul{color:var(--prose);font-size:13px;padding-left:1.15em;margin:10px 0;max-width
 </style></head><body>
 <div class="wrap">
   <nav><span class="lg">feedback</span><span class="crumb">/ docs</span>
-    <span class="sp"><a class="q" href="/">home</a><a class="q" href="#agent">agent</a><a class="q" href="https://github.com/merinids212/feedback">github</a></span></nav>
+    <span class="sp"><a class="q" href="/">home</a><a class="q" href="#agent">agent</a><a class="q" href="#safety">safety</a><a class="q" href="https://github.com/merinids212/feedback">github</a></span></nav>
 
   <h2>install</h2>
   <pre>❯ curl -fsSL <span class="p">https://feedback.cybercorpresearch.com/install.sh</span> | bash</pre>
@@ -538,14 +561,38 @@ wrangler deploy</pre>
 
   <h2>how it works</h2>
   <p>The Cloudflare Worker (<code>feedback.cybercorpresearch.com</code>) serves the friend page and stores submissions in KV. Your machine can't take inbound traffic, so a tiny local watcher <b>polls</b> the inbox and surfaces notes — either in-session (<code>feedback pull</code>, or the bundled Claude Code skill) or via <code>feedback watch</code>, which launches <a href="#agent">your agent</a>.</p>
-  <p>Friend text is wrapped in a fixed prompt template that labels it <b>feedback data, not instructions</b>, so a note can't hijack your session. Confirm mode (default) waits for your Enter per note; <code>--auto</code> fires immediately.</p>
+  <p>Friend text is fenced with a random per-run tag and labelled <b>feedback data, not instructions</b> — see <a href="#safety">safety &amp; security</a> for what that does and doesn't buy you. Confirm mode (default) waits for your Enter per note; <code>--auto</code> fires immediately.</p>
 
-  <h2>safety</h2>
+  <h2 id="safety">safety &amp; security</h2>
+  <p>Feedback deliberately connects a stranger's typing to an agent running on your machine.
+  That is the whole product, so it's worth being precise about what is and isn't protected —
+  for <b>you</b>, and for the <b>friend</b> who sends a note.</p>
+
+  <p class="cmd-title">for you — the person running it</p>
+  <table>
+    <tr><td>a note is data, not orders</td><td>Every note is fenced with a <b>random per-run tag</b> and labelled as an outsider's report. A sender who types the fence characters can't forge the end of their own quote and start issuing instructions — the tag isn't guessable.</td></tr>
+    <tr><td>no inherited bypass</td><td><code>PORTAL_FLAGS</code> is borrowed for convenience, but <code>--dangerously-skip-permissions</code> and friends are <b>stripped</b> from it. Your own sessions can skip approvals; a stranger's note doesn't. Setting <code>FEEDBACK_FLAGS</code> yourself is still honoured — that's an explicit choice.</td></tr>
+    <tr><td>unattended + unsandboxed is refused</td><td><code>--auto</code> combined with a bypass flag is <b>blocked</b> unless you set <code>FEEDBACK_I_TRUST_THE_LINK=1</code>. That pairing is remote code execution for anyone holding the link.</td></tr>
+    <tr><td>confirm mode by default</td><td>Without <code>--auto</code>, every note waits for your <code>↵</code>, and you see the full text first. Prompt-injection defence is layered, not absolute — the human in the loop is the last layer.</td></tr>
+    <tr><td>your inbox, your secret</td><td>You host the Worker, so notes live in <b>your</b> Cloudflare KV. The bearer secret stays in <code>~/.claude/feedback/secret</code> (chmod 600 — the CLI warns if it's group- or world-readable) and in the Worker env. It is never in the repo and never sent to a third party.</td></tr>
+    <tr><td>timing-safe auth</td><td>The Worker compares the bearer token in <b>constant time</b>, so response latency can't be used to walk the secret byte by byte.</td></tr>
+    <tr><td>bounded blast radius</td><td>Notes are capped at 4,000 characters, trimmed further before an agent sees them, and expire from KV after 30 days. Links expire (7d default) and cap submissions (50 default). <code>feedback kill &lt;slug&gt;</code> ends one immediately.</td></tr>
+  </table>
+
+  <p class="cmd-title">for your friend — the person sending</p>
+  <table>
+    <tr><td>no account, no tracking</td><td>The page asks for a note and an optional name. No sign-in, no cookies, no analytics, no IP logging beyond what Cloudflare does to serve the request.</td></tr>
+    <tr><td>their words go one place</td><td>Straight to your inbox. Not to us, not to a model provider — until you choose to hand the note to your agent.</td></tr>
+    <tr><td>the page can't be turned on them</td><td>Everything rendered is escaped; the markdown preview only ever links <code>http(s)</code> URLs, so a note can't inject script into the page — theirs or anyone's.</td></tr>
+    <tr><td>links are unguessable</td><td>9 characters from a 31-symbol alphabet (~44 bits), rejection-sampled so the randomness isn't skewed, and pages are <code>noindex</code>. Nobody stumbles onto your link.</td></tr>
+  </table>
+
+  <p class="cmd-title">what this does <em>not</em> protect against</p>
   <ul>
-    <li>Friend pages are <b>noindex</b>; links are <b>unguessable</b>, <b>expiring</b> (7d default), and <b>submission-capped</b>.</li>
-    <li>The secret stays in <code>~/.claude/feedback/secret</code> (chmod 600) and the Worker env — never in the repo.</li>
-    <li>Notes are wrapped as data, not instructions — but they still run prompts on your machine. Keep <b>confirm mode</b> on unless you fully trust who has the link.</li>
-    <li>Kill a link anytime with <code>feedback kill &lt;slug&gt;</code>.</li>
+    <li><b>A hostile note is still a prompt.</b> Fencing and labelling raise the bar; they are not a proof. Agents can be talked into things. Keep confirm mode on for links you've shared beyond people you trust.</li>
+    <li><b>Anyone with the link can write to your inbox</b> until it expires or hits its cap. The link <em>is</em> the credential — treat it like one, and <code>feedback kill</code> it when the round of feedback is done.</li>
+    <li><b>The project's folder path is stored with each note</b> (that's how notes route to the right repo). It sits in your own KV, but it is a path off your machine.</li>
+    <li><b>No per-IP rate limit.</b> Someone with the link can burn through the submission cap. The cap, not throttling, is what bounds it.</li>
   </ul>
 
   <p class="foot"><a href="/">home</a> · <a href="https://github.com/merinids212/feedback">github</a> · a <a href="https://portal.cybercorpresearch.com">cybercorpresearch</a> production · <a href="https://hicham.io">hicham.io</a> · <a href="https://x.com/merinids">@merinids</a></p>
