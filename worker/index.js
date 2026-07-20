@@ -308,34 +308,31 @@ pre.wm{margin:0 auto;display:block;width:-moz-fit-content;width:fit-content;text
 font-size:clamp(5.5px,1.9vw,13px);font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 background:linear-gradient(180deg,#ffffff,#6a6a6a);
 -webkit-background-clip:text;background-clip:text;color:transparent}
-.tag{color:var(--dim);margin:14px auto 0;max-width:500px;text-align:center}.tag b{color:var(--ink);font-weight:400}
+.tag{color:var(--dim);margin:16px auto 0;max-width:520px;text-align:center}.tag b{color:var(--ink);font-weight:400}
 /* agent marks — the one place this page spends color, each in its own real color */
 .cl{color:var(--claude)}
 ${MARK_CSS}
 .sub2{font-size:12.5px;color:var(--faint);margin-top:6px}
-.steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:26px 0 0}
-.step{display:flex;gap:11px;align-items:flex-start;padding:14px;border:1px solid var(--border);background:var(--panel)}
-.step b{color:var(--ink);font-weight:400;font-size:13px;display:block;margin-bottom:5px}
-.step span:last-child{color:var(--dim);font-size:11.5px;line-height:1.55;display:block}
-.step code{color:var(--ink);font-size:11px}
-.sn{flex:none;width:22px;height:22px;display:grid;place-items:center;font-size:12px;
-color:var(--bg);background:var(--hi)}
-.sn2{background:#b9b9b9}.sn3{background:#8f8f8f}
-@media(max-width:540px){.steps{grid-template-columns:1fr}}
-.cmd{display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--panel);margin:22px 0 4px;padding:12px 14px}
+/* the demo is the explanation; these two lines are the caption under it */
+.flow{margin:18px 0 0;color:var(--dim);font-size:12.5px;text-align:center;line-height:1.7}
+.flow b{color:var(--ink);font-weight:400}
+.agentline{margin:6px 0 0;color:var(--faint);font-size:12px;text-align:center}
+.agentline a{color:var(--faint);text-decoration:underline;text-underline-offset:2px}
+.agentline a:hover{color:var(--hi)}
+.cmd{display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--panel);margin:26px 0 4px;padding:12px 14px}
 .cmd code{flex:1;color:var(--ink);overflow-x:auto;white-space:nowrap;font-size:13.5px}
 .cmd code b{color:var(--hi)}
 .cp{background:transparent;border:1px solid var(--border);color:var(--dim);padding:5px 11px;cursor:pointer;font:inherit;font-size:12px}
 .cp:hover{color:var(--hi);border-color:var(--dim)}.cp.ok{color:var(--hi);border-color:var(--hi)}
-.req{color:var(--faint);font-size:12px;margin:6px 0 0}
+.req{color:var(--faint);font-size:12px;margin:6px 0 0;text-align:center}
 h2{font-size:12px;font-weight:400;color:var(--dim);letter-spacing:.09em;margin:40px 0 8px}
 h2::before{content:"── "}h2::after{content:" ──"}
-.dl{color:var(--faint);font-size:12.5px;margin:20px 0 0;letter-spacing:.02em}.dl a{color:var(--hi)}
-.term{border:1px solid var(--border);background:var(--panel);margin:12px 0 0}
+.dl{color:var(--faint);font-size:12.5px;margin:30px 0 0;letter-spacing:.02em;text-align:center}.dl a{color:var(--hi)}
+.term{border:1px solid var(--border);background:var(--panel);margin:34px 0 0}
 .tbar{padding:7px 12px;border-bottom:1px solid var(--line);color:var(--dim);font-size:12px}
 .tbar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--faint);margin-right:6px}
 .term{display:flex;flex-direction:column}
-.convo{padding:14px 14px 6px;height:300px;overflow-y:auto;scrollbar-gutter:stable;white-space:pre-wrap;font-size:12.5px;line-height:1.65;color:var(--ink)}
+.convo{padding:14px 14px 6px;height:264px;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-end;scrollbar-gutter:stable;white-space:pre-wrap;font-size:12.5px;line-height:1.65;color:var(--ink)}
 .cbox{margin:6px 14px 14px;border:1px solid var(--border);padding:9px 12px;
   display:flex;align-items:baseline;gap:8px;font-size:12.5px}
 .cpr{color:var(--hi)}
@@ -353,25 +350,20 @@ h2::before{content:"── "}h2::after{content:" ──"}
 ██╔══╝  ██╔══╝  ██╔══╝  ██║  ██║██╔══██╗██╔══██║██║     ██╔═██╗ 
 ██║     ███████╗███████╗██████╔╝██████╔╝██║  ██║╚██████╗██║  ██╗
 ╚═╝     ╚══════╝╚══════╝╚═════╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝</pre>
-  <p class="tag">a link you hand a friend — their note tunnels straight into the coding agent running on your machine, and lands as a prompt.</p>
-  <p class="tag sub2">Claude Code<span class="agents">${CLAUDE_MARK}</span> · Codex<span class="agents">${CODEX_MARK}</span> · anything you can launch from a shell</p>
+  <p class="tag">a link you hand a friend — their note lands in your coding agent, as a prompt.</p>
 
-  <div class="steps">
-    <div class="step"><span class="sn">1</span><div><b>you post a link</b><span>run <code>feedback link</code> in your project — a tidy URL, copied to your clipboard</span></div></div>
-    <div class="step"><span class="sn sn2">2</span><div><b>a friend jots a note</b><span>they open it, type in a little editor — plain words or markdown</span></div></div>
-    <div class="step"><span class="sn sn3">3</span><div><b>your agent picks it up</b><span>pulled in as data, not instructions — it triages and fixes what it can</span></div></div>
-  </div>
-
-  <h2>install</h2>
   <div class="cmd"><span style="color:var(--hi)">❯</span>
     <code id="cmd">curl -fsSL <b>https://feedback.cybercorpresearch.com/install.sh</b> | bash</code>
     <button class="cp" id="cp" onclick="cp()">copy</button></div>
-  <p class="req">macOS / Linux · needs zsh + python3 · plus a one-time <a href="https://github.com/merinids212/feedback#setup">Worker deploy</a> (you host it, so the secret is yours)</p>
+  <p class="req">macOS / Linux · zsh + python3 · one-time <a href="/docs#setup">Worker deploy</a>, hosted by you</p>
 
-  <h2>watch it happen</h2>
   <div class="term"><div class="tbar"><span class="dot"></span> <span class="cl">✳</span> claude code · ~/code/myapp</div><div class="convo" id="cv"></div><div class="cbox"><span class="cpr">›</span> <span id="ci"></span><span class="cur" id="ccur">█</span></div></div>
 
-  <p class="dl"><a href="/docs">docs →</a>&nbsp;&nbsp;setup · commands · in your session · how it works · safety</p>
+  <p class="flow"><b>you post a link</b> → <b>a friend jots a note</b> → <b>your agent picks it up</b>,
+  as data to triage — never as instructions.</p>
+  <p class="agentline">runs in Claude Code<span class="agents">${CLAUDE_MARK}</span> · Codex<span class="agents">${CODEX_MARK}</span> · <a href="/docs#agent">anything you can launch from a shell</a></p>
+
+  <p class="dl"><a href="/docs">docs →</a>&nbsp;&nbsp;setup · commands · agent · safety</p>
 
   <p class="foot"><a href="/docs">docs</a> · <a href="https://github.com/merinids212/feedback">github</a>
   · a <a href="https://portal.cybercorpresearch.com">cybercorpresearch</a> production
@@ -394,7 +386,7 @@ setTimeout(function(){b.textContent='copy';b.classList.remove('ok')},1600)})}
     '<span class="p">\u25cf</span> Bash('+D('feedback link')+')',
     '  '+D('\u23bf ')+PK('https://feedback\u2026/f/x7k2m9p'),
     D('     myapp \u00b7 7d \u00b7 this folder, auto-detected'),
-    D('     copied to clipboard \u2014 text it to a friend \ud83d\udc4b')
+    D('     copied to clipboard \u2014 text it to a friend')
   ]},
   { q:'any feedback come in?', r:[
     '<span class="p">\u25cf</span> Bash('+D('feedback pull')+')',
@@ -499,7 +491,7 @@ ul{color:var(--prose);font-size:13px;padding-left:1.15em;margin:10px 0;max-width
   <pre>❯ curl -fsSL <span class="p">https://feedback.cybercorpresearch.com/install.sh</span> | bash</pre>
   <p>macOS / Linux · needs <b>zsh</b> + <b>python3</b>. Drops a tiny local watcher into <code>~/.claude/feedback/</code> and sources it from your <code>~/.zshrc</code>. Open a new terminal after.</p>
 
-  <h2>setup — you host the Worker</h2>
+  <h2 id="setup">setup — you host the Worker</h2>
   <p>A friend's note runs as a prompt on <b>your</b> machine, so <b>you</b> own the inbox and the secret — nobody else, not even us. One-time, needs a Cloudflare account + the repo:</p>
   <pre><span class="c"># from a clone of the repo</span>
 cd worker
